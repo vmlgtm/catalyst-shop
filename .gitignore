@@ -1,0 +1,6 @@
+node_modules
+build
+logs
+credentials/
+.catalyst/
+build-output/

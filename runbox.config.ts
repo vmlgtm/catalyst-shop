@@ -43,36 +43,146 @@ export default defineConfig({
       id: "route-home",
       name: "Home (Home)",
       route: "/",
-      files: ["src/js/containers/Home/**"],
+      files: [
+        "src/js/containers/Home/**",
+        "src/js/components/Navbar.js",
+        "src/js/utils/catalogData.js",
+      ],
+      journey: async ({ page, step }) => {
+        await step("Filter catalog by Vitamins category", async () => {
+          await page.waitForSelector('[data-testid="cat-Vitamins"]');
+          await page.click('[data-testid="cat-Vitamins"]');
+        });
+        await step("Search & toggle price sort", async () => {
+          await page.fill('[data-testid="search-input"]', "Vitamin");
+          await page.click('[data-testid="sort-toggle"]');
+        });
+      },
+      assertInvariants: async ({ page }) => {
+        const text = await page.textContent('[data-testid="product-count"]');
+        const count = Number((text || "").trim());
+        if (Number.isNaN(count) || count < 0) {
+          throw new Error(`Product count invariant violated: ${text}`);
+        }
+      },
+      fuzz: {
+        enabled: true,
+        scopeSelector: '[data-testid="catalog-panel"]',
+        steps: 6,
+        runs: 8,
+      },
+    },
+    {
+      id: "route-product-id",
+      name: "Product Detail (ProductDetail)",
+      route: "/product/:id",
+      sampleRoute: "/product/vit-c",
+      files: [
+        "src/js/containers/ProductDetail/**",
+        "src/js/components/Navbar.js",
+        "src/js/utils/catalogData.js",
+      ],
+      journey: async ({ page, step }) => {
+        await step("Select 500mg dosage and 2x pack", async () => {
+          await page.waitForSelector('[data-testid="dose-500mg"]');
+          await page.click('[data-testid="dose-500mg"]');
+          await page.click('[data-testid="pack-2"]');
+        });
+        await step("Increment product quantity", async () => {
+          await page.click('[data-testid="pdp-inc"]');
+        });
+      },
+      assertInvariants: async ({ page }) => {
+        const text = await page.textContent('[data-testid="pdp-total"]');
+        const total = Number((text || "").replace("$", ""));
+        if (Number.isNaN(total) || total <= 0) {
+          throw new Error(`PDP total invariant violated: ${text}`);
+        }
+      },
+      fuzz: {
+        enabled: true,
+        scopeSelector: '[data-testid="pdp-panel"]',
+        steps: 6,
+        runs: 8,
+      },
     },
     {
       id: "route-cart",
       name: "Cart (Cart)",
       route: "/cart",
-      files: ["src/js/containers/Cart/**"],
+      files: [
+        "src/js/containers/Cart/**",
+        "src/js/components/CouponBox.js",
+        "src/js/components/Navbar.js",
+        "src/js/utils/pricingEngine.js",
+        "src/js/utils/catalogData.js",
+      ],
       journey: async ({ page, step }) => {
-        await step("Wait for Cart hydration & add 2 items ($20)", async () => {
+        await step("Wait for Cart hydration & adjust item quantities", async () => {
           await page.waitForSelector('[data-testid="add-item"]');
           await page.click('[data-testid="add-item"]');
-          await page.click('[data-testid="add-item"]');
+          await page.click('[data-testid="add-item-2"]');
         });
-        await step("Apply SAVE20 coupon ($20 off)", async () => {
+        await step("Apply SAVE20 coupon and toggle express/gift", async () => {
           await page.fill('[data-testid="coupon-input"]', "SAVE20");
           await page.click('[data-testid="apply-coupon"]');
+          await page.click('[data-testid="toggle-express"]');
+          await page.click('[data-testid="toggle-gift"]');
         });
       },
       assertInvariants: async ({ page }) => {
-        const text = await page.textContent('[data-testid="cart-total"]');
-        const num = Number((text || "").replace("$", ""));
-        if (Number.isNaN(num) || num < 0) {
-          throw new Error(`Cart total invariant violated: ${text}`);
+        const totalText = await page.textContent('[data-testid="cart-total"]');
+        const subtotalText = await page.textContent('[data-testid="cart-subtotal"]');
+        const discountText = await page.textContent('[data-testid="cart-discount"]');
+
+        const total = Number((totalText || "").replace("$", ""));
+        const subtotal = Number((subtotalText || "").replace("$", ""));
+        const discount = Number((discountText || "").replace("$", ""));
+
+        if (Number.isNaN(total) || total < 0) {
+          throw new Error(`Cart total invariant violated: ${totalText}`);
+        }
+        if (Number.isNaN(subtotal) || Number.isNaN(discount) || discount > subtotal) {
+          throw new Error(
+            `Cart discount invariant violated: discount=${discountText} > subtotal=${subtotalText}`
+          );
         }
       },
       fuzz: {
         enabled: true,
         scopeSelector: '[data-testid="cart-panel"]',
         steps: 6,
-        runs: 10,
+        runs: 8,
+      },
+    },
+    {
+      id: "route-orders",
+      name: "Orders (Orders)",
+      route: "/orders",
+      files: [
+        "src/js/containers/Orders/**",
+        "src/js/components/Navbar.js",
+        "src/js/utils/catalogData.js",
+      ],
+      journey: async ({ page, step }) => {
+        await step("Filter orders by Delivered and request refill", async () => {
+          await page.waitForSelector('[data-testid="status-Delivered"]');
+          await page.click('[data-testid="status-Delivered"]');
+          await page.click('[data-testid="refill-ORD-101"]');
+        });
+      },
+      assertInvariants: async ({ page }) => {
+        const text = await page.textContent('[data-testid="orders-count"]');
+        const count = Number((text || "").trim());
+        if (Number.isNaN(count) || count < 0) {
+          throw new Error(`Orders count invariant violated: ${text}`);
+        }
+      },
+      fuzz: {
+        enabled: true,
+        scopeSelector: '[data-testid="orders-panel"]',
+        steps: 6,
+        runs: 8,
       },
     },
   ],
